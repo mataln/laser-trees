@@ -268,10 +268,17 @@ def plot_depth_image(depth_image):
     return fig, ax
     
 def plot_depth_images(depth_images):
+    from_dataset = False
+    if len(depth_images.shape) == 4:
+        from_dataset = True
+    
     no_images = len(depth_images)
     fig, ax = plt.subplots(nrows=1, ncols=no_images, figsize=(30,5))
     
     for i in range(no_images):
-        ax[i].imshow(depth_images[i], origin='lower')
+        if from_dataset:
+            ax[i].imshow(depth_images[i][0], origin='lower')
+        else:
+            ax[i].imshow(depth_images[i], origin='lower')
         
     return fig, ax    

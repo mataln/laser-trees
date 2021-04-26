@@ -58,7 +58,7 @@ class TreeSpeciesDataset(Dataset):
 
             self.labels[i] = self.species.index(meta_entry.sp.values[0])#Get index of labels from species
             
-        self.labels = self.labels.int()
+        self.labels = self.labels.long()
         
         return
     

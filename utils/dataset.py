@@ -17,13 +17,22 @@ class TreeSpeciesDataset(Dataset):
         Args:
             metadata_file (string): Path to the metadata file.
             root_dir (string): Directory with all the images.
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
         """
         self.meta_frame = pd.read_csv(metadata_file, keep_default_na=False)
         self.species = list(self.meta_frame.groupby('sp')['id'].nunique().keys())
         
-        filenames = list(filter(lambda t:t.endswith('.txt'), os.listdir(data_dir)))
+        self.counts = self.meta_frame['sp'].value_counts() 
+        
+        self.data_dir = data_dir
+        
+        self.depth_images = None
+        self.labels = None
+        
+        return
+            
+    def build_depth_images(self):
+        
+        filenames = list(filter(lambda t:t.endswith('.txt'), os.listdir(self.data_dir)))
         no_files = len(filenames)
         
         #6 views, 1 channel
@@ -32,7 +41,7 @@ class TreeSpeciesDataset(Dataset):
         
         #Build the projections here rather than at access time
         for i, file in tqdm(enumerate(filenames), total=no_files):
-            cloud = utils.pc_from_txt(data_dir + file)
+            cloud = utils.pc_from_txt(self.data_dir + file)
             cloud = utils.center_and_scale(cloud)
             
             self.depth_images[i] =  torch.unsqueeze(
@@ -49,9 +58,50 @@ class TreeSpeciesDataset(Dataset):
 
             self.labels[i] = self.species.index(meta_entry.sp.values[0])#Get index of labels from species
             
+        self.labels = self.labels.int()
+        
+        return
+    
+    def remove_species(self, species):
+        if self.depth_images == None:
+            print("Only run remove_species after building depth images")
+            return
+        
+        idx = [] #Indices to keep
+        
+        for i in range(len(self.labels)): #Remove entries in images and labels for that species
+            if not(self.species[int(self.labels[i])] == species):
+                #self.depth_images = torch.cat([self.depth_images[:i], self.depth_images[i+1:]]) #Remove examples from depth images
+                #self.labels = torch.cat([self.labels[:i], self.labels[i+1:]]) #And labels
+                idx.append(i)
+                
+        self.depth_images = self.depth_images[idx]
+        self.labels = self.labels[idx]
+                
+        old_species = self.species.copy() 
+        self.species.pop(self.species.index(species)) #Pop from species list
+            
+        species_map = [self.species.index(species) if species in self.species else None for species in old_species]     
+            
+        #for j, species in enumerate(old_species): #Species map for old->new labels
+        #    #species_map[old_label] = new_label
+        #    if species in self.species: #If not the deleted species
+        #        species_map[j] = self.species.index(species)
+        
 
+        for k in range(len(self.labels)): #Apply species map to relabel
+            self.labels[k] = torch.tensor(species_map[int(self.labels[k])])
+            
+        self.counts = self.counts.drop(species)
+        
+        return
+
+            
     def __len__(self):
-        return len(self.meta_frame)
+        if self.labels == None:
+            return len(self.meta_frame)
+        else:
+            return len(self.labels)
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):

@@ -1,6 +1,7 @@
 data/*
 simpleview_pytorch/
 *.pt
+*wandb*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -12,7 +12,7 @@ class TreeSpeciesDataset(Dataset):
     """Dataset for tree species classification from
     point cloud depth projection images"""
 
-    def __init__(self, data_dir, metadata_file, image_dim=128, camera_fov_deg=90, f=1, camera_dist=1.4):
+    def __init__(self, data_dir, metadata_file):
         """
         Args:
             metadata_file (string): Path to the metadata file.
@@ -28,9 +28,18 @@ class TreeSpeciesDataset(Dataset):
         self.depth_images = None
         self.labels = None
         
+        self.image_dim = None
+        self.camera_fov_deg = None
+        self.f = None
+        self.camera_dist = None
+        
         return
             
-    def build_depth_images(self):
+    def build_depth_images(self, image_dim=128, camera_fov_deg=90, f=1, camera_dist=1.4):  
+        self.image_dim = image_dim
+        self.camera_fov_deg = camera_fov_deg
+        self.f = f
+        self.camera_dist = camera_dist
         
         filenames = list(filter(lambda t:t.endswith('.txt'), os.listdir(self.data_dir)))
         no_files = len(filenames)

@@ -1,5 +1,9 @@
 import os
 import numpy as np
+import torch
+
+import time
+
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
@@ -64,7 +68,7 @@ def center_and_scale(point_cloud):
     centered_cloud = point_cloud-np.mean(point_cloud, axis=0)
     return centered_cloud/np.max(abs(centered_cloud))
 
-def project_point(point, camera_projection, f=1):
+def project_point_np(point, camera_projection, f=1):
     """
     Perspective projection of a single point on to image plane.
     
@@ -101,21 +105,40 @@ def project_point(point, camera_projection, f=1):
     
     x_image_tilde = np.matmul(perspective_projection, x_camera_tilde)
     
-    #print(x_image_tilde)
-    
     x_image = np.array([x_image_tilde[0]/x_image_tilde[2], x_image_tilde[1]/x_image_tilde[2]])
     
     return x_image, x_camera_tilde[2]
 
-def project_points(points, camera_projection, f=1):
+def project_points_np(points, camera_projection, f=1):
     """
     Projects a list/numpy array of points in one go
     """
-    projected_points_depths = [project_point(point, camera_projection, f) for point in points]
+    projected_points_depths = [project_point_np(point, camera_projection, f) for point in points]
     projected_points = np.array([x[0] for x in projected_points_depths])
     projected_depths = np.array([x[1] for x in projected_points_depths])
     
     return projected_points, projected_depths
+
+def project_points(cloud, camera_projection, f=1, device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")):
+    x_world_tilde=torch.cat((torch.tensor(cloud), torch.ones(cloud.shape[0],1)), 1).transpose(0,1)  
+    x_world_tilde=x_world_tilde.float()
+    x_world_tilde=x_world_tilde.to(device=device)
+    
+    camera_projection = torch.tensor(camera_projection,
+                                     dtype=torch.float32)
+    
+    perspective_projection = torch.tensor([
+                            [f, 0, 0, 0],
+                            [0, f, 0, 0],
+                            [0, 0, 1, 0],
+                            ], dtype=torch.float32)
+    
+    projection_matrix = torch.matmul(perspective_projection, camera_projection)
+    projection_matrix = projection_matrix.to(device=device)
+    
+    x_image_tilde = torch.matmul(projection_matrix, x_world_tilde)
+    
+    return (x_image_tilde[0:2]/x_image_tilde[2]).transpose(0,1), x_image_tilde[2]
 
 def get_rotation_matrix(a, b):
     """
@@ -169,7 +192,7 @@ def get_camera_projection(camera_position, camera_z_direction, camera_x_directio
     return pr
     
 
-def depth_image_from_projection(points, depths, camera_fov_deg=90, image_dim=128):
+def depth_image_from_projection(points, depths, camera_fov_deg=90, image_dim=128, k=50, use_hard_min=False):
     """
     Plots a depth image from perspective projected points
     
@@ -181,28 +204,39 @@ def depth_image_from_projection(points, depths, camera_fov_deg=90, image_dim=128
     
     #The maximum projected image coordinate based on camera FOV
     max_value = np.tan(np.radians(camera_fov_deg/2))
-    
+  
+    no_points = len(points)
     points = points + max_value #Change range from -max->max to 0->2*max
-    pixel_coords = [ [round(x[0]/(2*max_value) * image_dim), round(x[1]/(2*max_value) * image_dim)] for x in points]
-    
-    image = np.zeros(shape=(image_dim, image_dim))
-    
-    for coord, depth in zip(pixel_coords, depths):
-        i, j = coord[1], coord[0]
-        if (0 <= i < image_dim) and (0 <= j < image_dim): #If not outside the FOV
-            if not(image[i, j]):
-                image[i, j] = depth
-            elif depth < image[i, j]: #If there's something else there
-                image[i, j] = depth
-                    
-    #min_val = np.min(image)                
-    #print(min_val)                
-        
-    #image[np.isclose(image, 0, atol=1e-15)==True] = min_val
-    
-    return image
+    pixel_coords = torch.round(points/(2*max_value) * image_dim).long()
 
-def get_depth_images_from_cloud(points, camera_fov_deg=90, image_dim=128, f=1, camera_dist=1.4):
+            
+    if use_hard_min:
+        max_coord = max(int(torch.max(pixel_coords)), image_dim)
+        image = torch.zeros(size=(max_coord+1, max_coord+1))   
+
+        for coord, depth in zip(pixel_coords, depths):
+            i, j = int(coord[1]), int(coord[0])
+            if (0 <= i < image_dim) and (0 <= j < image_dim): #If not outside the FOV
+                if not(image[i, j]):
+                    image[i, j] = depth
+                elif depth < image[i, j]: #If there's something else there
+                    image[i, j] = depth
+                    
+        return image
+    
+    else:
+        pos_filter = torch.logical_and(pixel_coords[:,0]>=0, pixel_coords[:,1]>=0)
+        pixel_coords = pixel_coords[pos_filter]
+        depths = depths[pos_filter]
+        sparse = torch.sparse_coo_tensor(pixel_coords.t(), torch.pow(depths, -k), (image_dim, image_dim))
+        sparse = sparse.coalesce()
+        sparse = torch.pow(sparse, -1/k)
+        return sparse.t().to_dense().to('cpu')#image[0:image_dim, 0:image_dim]
+
+    
+    
+
+def get_depth_images_from_cloud(points, camera_fov_deg=90, image_dim=128, f=1, camera_dist=1.4, k=50, use_hard_min=False):
     """
     Returns a set of 6 depth images from axis viewpoints, given the point cloud (Not the projected points)
     """
@@ -256,10 +290,33 @@ def get_depth_images_from_cloud(points, camera_fov_deg=90, image_dim=128, f=1, c
     ])         
     ]
     
-    points_depths = [project_points(points, camera_projection, f) for camera_projection in camera_projections]
-    depth_images = [depth_image_from_projection(points, depths, camera_fov_deg, image_dim) for points, depths in points_depths]
+    start = time.time()
     
-    return np.array(depth_images)
+    points_depths = [project_points(cloud=points, 
+                                    camera_projection=camera_projection, 
+                                    f=f) 
+                     for camera_projection in camera_projections]
+    
+    end = time.time()
+    #print("Time projecting: ", end-start)
+    
+    start=time.time()
+
+    depth_images = [depth_image_from_projection(points=points, 
+                                                depths=depths, 
+                                                camera_fov_deg=camera_fov_deg, 
+                                                image_dim=image_dim, 
+                                                k=k,
+                                                use_hard_min=use_hard_min).unsqueeze(axis=0) 
+                    for points, depths in points_depths]
+    
+    depth_images = torch.cat(depth_images)
+    end=time.time()
+    #print("Time imaging: ", end-start)
+    
+    
+    
+    return depth_images
 
 def plot_depth_image(depth_image):
     fig, ax = plt.subplots(figsize=(5,5))

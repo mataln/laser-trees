@@ -32,13 +32,15 @@ class TreeSpeciesDataset(Dataset):
         self.camera_fov_deg = None
         self.f = None
         self.camera_dist = None
+        self.soft_min_k = None
         
         return
             
-    def build_depth_images(self, image_dim=128, camera_fov_deg=90, f=1, camera_dist=1.4):  
+    def build_depth_images(self, image_dim=128, camera_fov_deg=90, f=1, camera_dist=1.4, soft_min_k=50):  
         self.image_dim = image_dim
         self.camera_fov_deg = camera_fov_deg
         self.f = f
+        self.soft_min_k = soft_min_k
         self.camera_dist = camera_dist
         
         filenames = list(filter(lambda t:t.endswith('.txt'), os.listdir(self.data_dir)))
@@ -54,14 +56,13 @@ class TreeSpeciesDataset(Dataset):
             cloud = utils.center_and_scale(cloud)
             
             self.depth_images[i] =  torch.unsqueeze(
-                                    torch.from_numpy(
                                     utils.get_depth_images_from_cloud(cloud, 
                                                                    image_dim=image_dim, 
                                                                    camera_fov_deg=camera_fov_deg, 
                                                                    f=f, 
                                                                    camera_dist=camera_dist
                                                                    )
-                                    ), 1)
+                                    , 1)
             
             meta_entry = self.meta_frame[self.meta_frame.id==file[:-4]]
 

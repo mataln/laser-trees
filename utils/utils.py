@@ -1,11 +1,15 @@
 import os
 import numpy as np
-import torch
-
 import time
+
+import torch
+import torch.nn.functional as F
+
 
 from matplotlib import pyplot as plt
 from tqdm import tqdm
+
+
 
 def pc_from_txt(filename):
     """
@@ -226,8 +230,12 @@ def depth_image_from_projection(points, depths, camera_fov_deg=90, image_dim=128
     
     else:
         pos_filter = torch.logical_and(pixel_coords[:,0]>=0, pixel_coords[:,1]>=0)
-        pixel_coords = pixel_coords[pos_filter]
-        depths = depths[pos_filter]
+        max_filter = torch.logical_and(pixel_coords[:,0]<image_dim, pixel_coords[:,1]<image_dim)
+        
+        range_filter = torch.logical_and(pos_filter, max_filter)
+        
+        pixel_coords = pixel_coords[range_filter]
+        depths = depths[range_filter]
         sparse = torch.sparse_coo_tensor(pixel_coords.t(), torch.pow(depths, -k), (image_dim, image_dim))
         sparse = sparse.coalesce()
         sparse = torch.pow(sparse, -1/k)
@@ -339,3 +347,22 @@ def plot_depth_images(depth_images):
             ax[i].imshow(depth_images[i], origin='lower')
         
     return fig, ax    
+
+def smooth_loss(pred, gold, smoothing=True):
+    ''' Calculate cross entropy loss, apply label smoothing if needed. '''
+
+    gold = gold.contiguous().view(-1)
+
+    if smoothing:
+        eps = 0.2
+        n_class = pred.size(1)
+
+        one_hot = torch.zeros_like(pred).scatter(1, gold.view(-1, 1), 1)
+        one_hot = one_hot * (1 - eps) + (1 - one_hot) * eps / (n_class - 1)
+        log_prb = F.log_softmax(pred, dim=1)
+
+        loss = -(one_hot * log_prb).sum(dim=1).mean()
+    else:
+        loss = F.cross_entropy(pred, gold, reduction='mean')
+
+    return loss

@@ -1,10 +1,13 @@
 import utils
 
 import torch
+torch.pi = torch.acos(torch.zeros(1)).item() * 2
+
 from tqdm import tqdm
 from torch.utils.data import Dataset
 
 import pandas as pd
+
 import os
 
 
@@ -150,6 +153,15 @@ class TreeSpeciesPointDataset(Dataset):
         self.f = None
         self.camera_dist = None
         self.soft_min_k = None
+        self.transforms = None
+        
+        self.min_rotation = None
+        self.max_rotation = None
+        
+        self.min_translation = None
+        self.max_translation = None
+        
+        self.jitter_std = None
         
         filenames = list(filter(lambda t:t.endswith('.txt'), os.listdir(self.data_dir)))
         no_files = len(filenames)
@@ -170,9 +182,29 @@ class TreeSpeciesPointDataset(Dataset):
         return
     
     
-    def get_depth_image(self, i):
+    def get_depth_image(self, i, transforms = None):
+        if transforms is None:
+            transforms = self.transforms
+        
+        points = self.point_clouds[i]    
+            
+        if 'rotation' in transforms:
+            points = self.random_rotation(points, 
+                                          min_rotation=self.min_rotation,
+                                          max_rotation=self.max_rotation)
+            
+        if 'translation' in transforms:
+            points = self.random_translation(points,
+                                             min_translation=self.min_translation,
+                                             max_translation=self.max_translation)
+            
+        if 'jitter' in transforms:
+            points = self.jitter(points,
+                                 jitter_std = self.jitter_std)
+            
+        
         return torch.unsqueeze(
-               utils.get_depth_images_from_cloud(points=self.point_clouds[i], 
+               utils.get_depth_images_from_cloud(points=points, 
                                                  image_dim=self.image_dim, 
                                                  camera_fov_deg=self.camera_fov_deg, 
                                                  f=self.f, 
@@ -210,7 +242,13 @@ class TreeSpeciesPointDataset(Dataset):
                    camera_fov_deg = None,
                    f = None,
                    camera_dist = None,
-                   soft_min_k = None):
+                   soft_min_k = None,
+                   transforms = None,
+                   min_rotation = None,
+                   max_rotation = None,
+                   min_translation = None,
+                   max_translation = None,
+                   jitter_std = None):
      
         if image_dim:    
             self.image_dim = image_dim        
@@ -222,8 +260,55 @@ class TreeSpeciesPointDataset(Dataset):
             self.camera_dist = camera_dist      
         if soft_min_k:
             self.soft_min_k = soft_min_k
+        if transforms:
+            self.transforms = transforms
+            
+            if 'rotation' in transforms:
+                self.min_rotation = min_rotation
+                self.max_rotation = max_rotation
+                
+            if 'translation' in transforms:
+                self.min_translation = min_translation
+                self.max_translation = max_translation
+                
+            if 'jitter' in transforms:
+                self.jitter_std = jitter_std
             
         return
+    
+    def random_rotation(self,
+                        point_cloud,
+                        min_rotation=0,
+                        max_rotation=2*torch.pi):
+          
+        theta = torch.rand(1)*(max_rotation - min_rotation) + min_rotation
+        
+        Rz = torch.tensor([
+        [torch.cos(theta), -torch.sin(theta), 0],
+        [torch.sin(theta),  torch.cos(theta), 0],
+        [0               ,                 0, 1],
+        ]).double()
+        
+        return torch.matmul(point_cloud, Rz.t())
+    
+    def random_translation(self,
+                           point_cloud,
+                           min_translation = 0,
+                           max_translation = 0.1):
+        
+        tran = torch.rand(3)*(max_translation - min_translation) + min_translation
+        
+        return point_cloud + tran
+    
+    def jitter(self,
+               point_cloud,
+               jitter_std = 3e-4):
+    
+        cloud_jitter = torch.randn(point_cloud.shape)*jitter_std
+        
+        return point_cloud + cloud_jitter
+        
+        
             
     def __len__(self):
         if self.labels == None:

@@ -124,7 +124,7 @@ def project_points_np(points, camera_projection, f=1):
     return projected_points, projected_depths
 
 def project_points(cloud, camera_projection, f=1, device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")):
-    x_world_tilde=torch.cat((torch.tensor(cloud), torch.ones(cloud.shape[0],1)), 1).transpose(0,1)  
+    x_world_tilde=torch.cat((cloud.clone().detach(), torch.ones(cloud.shape[0],1)), 1).transpose(0,1)  
     x_world_tilde=x_world_tilde.float()
     x_world_tilde=x_world_tilde.to(device=device)
     

@@ -288,7 +288,8 @@ def train(data_dir, model_dir, params):
                 "Validation Loss":val_loss,
                 "Train Accuracy":train_acc,
                 "Validation Accuracy":val_acc,
-                "Learning Rate":optimizer.param_groups[0]['lr']
+                "Learning Rate":optimizer.param_groups[0]['lr'],
+                "Epoch":epoch
                 })
 
             scheduler.step()
@@ -301,6 +302,15 @@ def train(data_dir, model_dir, params):
                '{model_dir}/{fname}.pt'.format(
                    model_dir=model_dir,
                    fname=experiment_name+'_best.pt')
+              )
+    print('Saved!')
+    
+    print('Saving converged model...')
+    converged_model_state = copy.deepcopy(model.state_dict())
+    torch.save(converged_model_state,
+               '{model_dir}/{fname}.pt'.format(
+                   model_dir=model_dir,
+                   fname=experiment_name+'_converged.pt')
               )
     print('Saved!')
 

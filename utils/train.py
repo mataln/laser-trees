@@ -185,6 +185,7 @@ def train(data_dir, model_dir, params):
 
     #wandb.watch(model)
     best_acc = 0
+    best_min_acc = 0
     for epoch in range(config.epochs):  # loop over the dataset multiple times
 
         #Training loop============================================
@@ -273,8 +274,10 @@ def train(data_dir, model_dir, params):
 
             cm = confusion_matrix(all_labels.cpu(), all_predictions.cpu())
             totals = cm.sum(axis=1)
-
+            
+            accs = np.zeros(len(totals))
             for i in range(len(totals)):
+                accs[i] = cm[i,i]/totals[i]
                 print(f"{trees_data.species[i]}: Got {cm[i,i]}/{totals[i]} with accuracy {(cm[i,i]/totals[i])*100:.2f}")
                 wandb.log({f"{trees_data.species[i]} Accuracy":(cm[i,i]/totals[i])}, commit = False)
 
@@ -282,7 +285,11 @@ def train(data_dir, model_dir, params):
             if val_acc > best_acc:
                 best_model_state = copy.deepcopy(model.state_dict())
                 best_acc = val_acc
-
+                
+            if min(accs) > best_min_acc:
+                best_min_model_state = copy.deepcopy(model.state_dict())
+                best_min_acc = min(accs)
+                
             wandb.log({
                 "Train Loss":train_loss,
                 "Validation Loss":val_loss,
@@ -298,19 +305,31 @@ def train(data_dir, model_dir, params):
     print('Finished Training')
 
     print('Saving best model...')
+    print('Best overall accuracy: ' + best_acc)
     torch.save(best_model_state,
                '{model_dir}/{fname}.pt'.format(
                    model_dir=model_dir,
-                   fname=experiment_name+'_best.pt')
+                   fname=experiment_name+'_best')
               )
     print('Saved!')
     
     print('Saving converged model...')
+    print('Converged accuracy: ' + val_acc)
     converged_model_state = copy.deepcopy(model.state_dict())
     torch.save(converged_model_state,
                '{model_dir}/{fname}.pt'.format(
                    model_dir=model_dir,
-                   fname=experiment_name+'_converged.pt')
+                   fname=experiment_name+'_converged')
+              )
+    print('Saved!')
+    
+    print('Saving best producer accuracy model...')
+    print('Best min producer accuracy: ' + best_min_acc)
+    converged_model_state = copy.deepcopy(model.state_dict())
+    torch.save(best__min_model_state,
+               '{model_dir}/{fname}.pt'.format(
+                   model_dir=model_dir,
+                   fname=experiment_name+'_best')
               )
     print('Saved!')
 

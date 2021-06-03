@@ -282,11 +282,11 @@ def train(data_dir, model_dir, params):
                 wandb.log({f"{trees_data.species[i]} Accuracy":(cm[i,i]/totals[i])}, commit = False)
 
 
-            if val_acc > best_acc:
+            if val_acc >= best_acc:
                 best_model_state = copy.deepcopy(model.state_dict())
                 best_acc = val_acc
                 
-            if min(accs) > best_min_acc:
+            if min(accs) >= best_min_acc:
                 best_min_model_state = copy.deepcopy(model.state_dict())
                 best_min_acc = min(accs)
                 
@@ -325,8 +325,7 @@ def train(data_dir, model_dir, params):
     
     print('Saving best producer accuracy model...')
     print('Best min producer accuracy: {}'.format(best_min_acc))
-    converged_model_state = copy.deepcopy(model.state_dict())
-    torch.save(best__min_model_state,
+    torch.save(best_min_model_state,
                '{model_dir}/{fname}.pt'.format(
                    model_dir=model_dir,
                    fname=experiment_name+'_best')

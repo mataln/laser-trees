@@ -286,9 +286,13 @@ def train(data_dir, model_dir, params):
                 best_model_state = copy.deepcopy(model.state_dict())
                 best_acc = val_acc
                 
+            wandb.log({"Best_acc":best_acc}, commit = False)
+                
             if min(accs) >= best_min_acc:
                 best_min_model_state = copy.deepcopy(model.state_dict())
                 best_min_acc = min(accs)
+                
+            wandb.log({"Best_min_acc":best_min_acc}, commit = False)
                 
             wandb.log({
                 "Train Loss":train_loss,

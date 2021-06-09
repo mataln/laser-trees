@@ -186,6 +186,8 @@ def train(data_dir, model_dir, params):
     #wandb.watch(model)
     best_acc = 0
     best_min_acc = 0
+    
+    run.tags.append("new_sweep")
     for epoch in range(config.epochs):  # loop over the dataset multiple times
 
         #Training loop============================================

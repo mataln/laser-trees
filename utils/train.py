@@ -311,7 +311,7 @@ def train(data_dir, model_dir, params):
     print('Saving best model...')
     print('Best overall accuracy: {}'.format(best_acc))
     torch.save(best_model_state,
-               '{model_dir}/{fname}.pt'.format(
+               '{model_dir}/{fname}'.format(
                    model_dir=model_dir,
                    fname=experiment_name+'_best')
               )
@@ -321,7 +321,7 @@ def train(data_dir, model_dir, params):
     print('Converged accuracy: {}'.format(val_acc))
     converged_model_state = copy.deepcopy(model.state_dict())
     torch.save(converged_model_state,
-               '{model_dir}/{fname}.pt'.format(
+               '{model_dir}/{fname}'.format(
                    model_dir=model_dir,
                    fname=experiment_name+'_converged')
               )
@@ -330,9 +330,9 @@ def train(data_dir, model_dir, params):
     print('Saving best producer accuracy model...')
     print('Best min producer accuracy: {}'.format(best_min_acc))
     torch.save(best_min_model_state,
-               '{model_dir}/{fname}.pt'.format(
+               '{model_dir}/{fname}'.format(
                    model_dir=model_dir,
-                   fname=experiment_name+'_best')
+                   fname=experiment_name+'_best_prod')
               )
     print('Saved!')
 

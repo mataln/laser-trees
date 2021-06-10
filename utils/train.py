@@ -85,7 +85,8 @@ def train(data_dir, model_dir, params):
     run = wandb.init(
         project='laser-trees',
         group=experiment_name,
-        config=params)    
+        config=params,
+        tags=["new_sweep"])    
 
     config = wandb.config
     torch.manual_seed(config.random_seed)
@@ -187,7 +188,6 @@ def train(data_dir, model_dir, params):
     best_acc = 0
     best_min_acc = 0
     
-    run.tags.append("new_sweep")
     for epoch in range(config.epochs):  # loop over the dataset multiple times
 
         #Training loop============================================

@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import time
+import math
 
 import torch
 import torch.nn.functional as F
@@ -124,6 +125,9 @@ def project_points_np(points, camera_projection, f=1):
     return projected_points, projected_depths
 
 def project_points(cloud, camera_projection, f=1, device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")):
+    if type(cloud) == np.ndarray:
+        cloud = torch.from_numpy(cloud)
+    
     x_world_tilde=torch.cat((cloud.clone().detach(), torch.ones(cloud.shape[0],1)), 1).transpose(0,1)  
     x_world_tilde=x_world_tilde.float()
     x_world_tilde=x_world_tilde.to(device=device)
@@ -332,19 +336,32 @@ def plot_depth_image(depth_image):
     
     return fig, ax
     
-def plot_depth_images(depth_images):
+def plot_depth_images(depth_images, nrows=2, figsize=None):
     from_dataset = False
     if len(depth_images.shape) == 4:
         from_dataset = True
     
     no_images = len(depth_images)
-    fig, ax = plt.subplots(nrows=1, ncols=no_images, figsize=(30,5))
+    
+    ncols = math.ceil(no_images/nrows)
+    
+    if figsize == None:
+        figsize = (5*ncols, 5*nrows)
+    
+    fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize)
+    
     
     for i in range(no_images):
         if from_dataset:
-            ax[i].imshow(depth_images[i][0], origin='lower')
+            if nrows>1:
+                ax[i//ncols,i%ncols].imshow(depth_images[i][0], origin='lower')
+            else:
+                ax[i].imshow(depth_images[i][0], origin='lower')
         else:
-            ax[i].imshow(depth_images[i], origin='lower')
+            if nrows>1:
+                ax[i//ncols,i%ncols].imshow(depth_images[i], origin='lower')
+            else:
+                ax[i].imshow(depth_images[i], origin='lower')
         
     return fig, ax    
 

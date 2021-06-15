@@ -1,4 +1,6 @@
-import os
+with open('filename.pickle', 'wb') as handle:
+    pickle.dump(a, handle, protocol=pickle.HIGHEST_PROTOCOL)with open('filename.pickle', 'wb') as handle:
+    pickle.dump(a, handle, protocol=pickle.HIGHEST_PROTOCOL)import os
 import sys
 import copy
 pdir = os.path.dirname(os.getcwd())
@@ -72,6 +74,73 @@ def predict(dataset, val_indices, model, params):
 
                 
         return all_logits, all_labels, all_predictions
+    
+def predict_from_dirs(dataset_dir, model_dir):#Load data
+    val_data = torch.load(dataset_dir)
+
+    params = {
+        "dataset_type":type(val_data),
+        "batch_size":128,
+        "validation_split":.2,
+        "shuffle_dataset":True,
+        "random_seed":0,
+        "learning_rate":[0.0005, 100, 0.5],  #[init, step_size, gamma] for scheduler
+        "momentum":0.9, #Only used for sgd
+        "epochs":300,
+        "loss_fn":"smooth-loss",
+        "optimizer":"adam",
+        "voting":"None",
+        "train_sampler":"balanced",
+
+        "model":"SimpleView",
+
+        "image_dim":256,
+        "camera_fov_deg":90,
+        "f":1,
+        "camera_dist":1.4,
+        "depth_averaging":"min",
+        "soft_min_k":50,
+        "num_views":6,
+
+        "transforms":['none'],
+        "min_rotation":0,
+        "max_rotation":2*np.pi,
+        "min_translation":0,
+        "max_translation":0.5,
+        "jitter_std":3e-5, 
+
+        "species":["QUEFAG", "PINNIG", "QUEILE", "PINSYL", "PINPIN"],
+        "data_resolution":"2.5cm"
+    }
+
+    val_data.set_params(image_dim = params["image_dim"],
+                     camera_fov_deg = params["camera_fov_deg"],
+                     f = params["f"],
+                     camera_dist = params["camera_dist"],
+                     soft_min_k = params["soft_min_k"],
+                     transforms = params["transforms"],
+                     min_rotation = params["min_rotation"],
+                     max_rotation = params["max_rotation"],
+                     min_translation = params["min_translation"],
+                     max_translation = params["max_translation"],
+                     jitter_std = params["jitter_std"]
+                     )
+
+    #Load model
+    model = SimpleView(
+            num_views=params["num_views"],
+            num_classes=len(params["species"])
+            )
+
+    model.load_state_dict(torch.load(model_dir))
+
+    #Load validation indices
+    val_indices = list(np.load(f'indices/val_indices_{params["random_seed"]}.npy'))
+    val_indices = [int(vi) for vi in val_indices]
+
+    logits, labels, predictions = utils.predict(dataset=val_data, val_indices=val_indices, model=model, params=params)
+    
+    return logits, labels, predictions, val_data.species
     
     
 def get_angles(start, end, n_angles):

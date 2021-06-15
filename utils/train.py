@@ -91,7 +91,7 @@ def train(data_dir, model_dir, params):
     config = wandb.config
     torch.manual_seed(config.random_seed)
     torch.cuda.manual_seed(config.random_seed)
-    torch.random.manual_seed(seed)
+    torch.random.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
     random.seed(config.random_seed)
 

@@ -3,6 +3,8 @@ simpleview_pytorch/
 *.pt
 *wandb*
 *.zip
+*.pkl
+*.pickle
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

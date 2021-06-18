@@ -1,6 +1,4 @@
-with open('filename.pickle', 'wb') as handle:
-    pickle.dump(a, handle, protocol=pickle.HIGHEST_PROTOCOL)with open('filename.pickle', 'wb') as handle:
-    pickle.dump(a, handle, protocol=pickle.HIGHEST_PROTOCOL)import os
+import os
 import sys
 import copy
 pdir = os.path.dirname(os.getcwd())

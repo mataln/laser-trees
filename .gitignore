@@ -5,6 +5,7 @@ simpleview_pytorch/
 *.zip
 *.pkl
 *.pickle
+*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

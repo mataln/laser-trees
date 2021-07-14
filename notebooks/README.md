@@ -15,5 +15,3 @@ Rotation voting + plots notebook
 #### run_experiments.ipynb
 Train model using multiple sets of hyperparameters
 
-#### tmp.ipynb
-To delete

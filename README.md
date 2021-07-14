@@ -19,6 +19,6 @@ from either the base directory or from within /sh to download the code for the n
 
 ## Data used
 
-Data gathered by H.J.F Owen (2021) - not openly available for download at the moment
+Data gathered by H. Owen (2021) & W. Flynn  - not openly available for download at the moment. Contact me for further details
 
 https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/1365-2745.13670

@@ -9,6 +9,7 @@ dependencies:
   - jupyterlab-git
   - matplotlib >=3.3
   - scikit-learn
+  - wandb
   
   - pytorch>=1.5.0
   - torchvision

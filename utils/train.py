@@ -25,8 +25,8 @@ from simpleview_pytorch import SimpleView
 from torch.utils.data.dataset import Dataset
 
 
-def train(data_dir, model_dir, params):
-    wandb.login()
+def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_wandb=True):
+    #wandb.login()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -34,6 +34,7 @@ def train(data_dir, model_dir, params):
 
     trees_data = torch.load(dataset_name)
     val_data = torch.load(dataset_name)
+    
     print(trees_data.counts)
     print('Species: ', trees_data.species)
     print('Labels: ', trees_data.labels)
@@ -52,6 +53,8 @@ def train(data_dir, model_dir, params):
                              max_rotation = params["max_rotation"],
                              min_translation = params["min_translation"],
                              max_translation = params["max_translation"],
+                             min_scale = params["min_scale"],
+                             max_scale = params["max_scale"],
                              jitter_std = params["jitter_std"]
                              )
 
@@ -65,6 +68,8 @@ def train(data_dir, model_dir, params):
                              max_rotation = params["max_rotation"],
                              min_translation = params["min_translation"],
                              max_translation = params["max_translation"],
+                             min_scale = params["min_scale"],
+                             max_scale = params["max_scale"],
                              jitter_std = params["jitter_std"]
                              )
 
@@ -82,12 +87,15 @@ def train(data_dir, model_dir, params):
 
     experiment_name = wandb.util.generate_id()
 
-    run = wandb.init(
-        project='laser-trees',
-        group=experiment_name,
-        config=params,
-        tags=["new_sweep"])    
-
+    if init_wandb:
+        run = wandb.init(
+            project=wandb_project,
+            group=experiment_name,
+            config=params,
+            reinit=False
+            )
+    
+    wandb.config.update(params)
     config = wandb.config
     torch.manual_seed(config.random_seed)
     torch.cuda.manual_seed(config.random_seed)
@@ -118,12 +126,14 @@ def train(data_dir, model_dir, params):
 
     dataset_size = len(trees_data)
     indices = list(range(dataset_size))
-    split = int(np.floor(config.validation_split * dataset_size))
+    split2 = int(np.floor( (config.validation_split+config.test_split) * dataset_size ))
+    split1 = int(np.floor( config.test_split * dataset_size ))
 
-    if config.shuffle_dataset :
+    if config.shuffle_dataset:
         print("Shuffling dataset...")
         np.random.shuffle(indices)
-    train_indices, val_indices = indices[split:], indices[:split]
+                 
+    train_indices, val_indices, test_indices = indices[split2:], indices[split1:split2], indices[:split1]
 
     #Train sampler==========================================
     if config.train_sampler == "random": 
@@ -137,6 +147,7 @@ def train(data_dir, model_dir, params):
 
         sample_weights = torch.stack([label_weights[label] for label in trees_data.labels]) #Corresponding weight for each sample
         sample_weights[val_indices] = 0 #Never sample the validation dataset - set weights to zero
+        sample_weights[test_indices] = 0 #Same for test dataset
 
         train_sampler = WeightedRandomSampler(sample_weights, len(sample_weights))
     #=======================================================    
@@ -339,4 +350,5 @@ def train(data_dir, model_dir, params):
               )
     print('Saved!')
 
-    run.finish()
+    if "run" in locals():
+        run.finish()

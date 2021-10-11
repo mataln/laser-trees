@@ -327,7 +327,7 @@ def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_w
     torch.save(best_model_state,
                '{model_dir}/{fname}'.format(
                    model_dir=model_dir,
-                   fname=experiment_name+'_best')
+                   fname=wandb.run.name+'_best')
               )
     print('Saved!')
     
@@ -337,7 +337,7 @@ def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_w
     torch.save(converged_model_state,
                '{model_dir}/{fname}'.format(
                    model_dir=model_dir,
-                   fname=experiment_name+'_converged')
+                   fname=wandb.run.name+'_converged')
               )
     print('Saved!')
     
@@ -346,7 +346,7 @@ def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_w
     torch.save(best_min_model_state,
                '{model_dir}/{fname}'.format(
                    model_dir=model_dir,
-                   fname=experiment_name+'_best_prod')
+                   fname=wandb.run.name+'_best_prod')
               )
     print('Saved!')
 

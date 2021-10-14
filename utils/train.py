@@ -205,6 +205,9 @@ def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_w
     best_acc = 0
     best_min_acc = 0
     
+    best_test_acc = 0
+    best_min_test_acc = 0
+    
     for epoch in range(config.epochs):  # loop over the dataset multiple times
 
         #Training loop============================================
@@ -239,9 +242,13 @@ def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_w
 
         num_val_correct = 0
         num_val_samples = 0
+        
+        num_test_correct = 0
+        num_test_samples = 0
 
         running_train_loss = 0
         running_val_loss = 0
+        running_test_loss = 0
 
         model.eval()  
         with torch.no_grad():
@@ -371,7 +378,7 @@ def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_w
                 
             if min(accs) >= best_min_test_acc:
                 best_min_test_model_state = copy.deepcopy(model.state_dict())
-                best_min_acc = min(accs)
+                best_min_test_acc = min(accs)
                 
             wandb.log({"Best_min_test_acc":best_min_test_acc}, commit = False)
             #==================================
@@ -429,14 +436,14 @@ def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_w
     torch.save(best_test_model_state,
                '{model_dir}/{fname}'.format(
                    model_dir=model_dir,
-                   fname=wandb.run.name+'_best_test')
+                   fname=wandb.run.name+'_best_test'))
                
     print('Saving best (test) producer accuracy model...')
     print('Best (test) min producer accuracy: {}'.format(best_min_test_acc))
     torch.save(best_min_test_model_state,
                '{model_dir}/{fname}'.format(
                    model_dir=model_dir,
-                   fname=wandb.run.name+'_best_test_prod')
+                   fname=wandb.run.name+'_best_test_prod'))
                
 
 

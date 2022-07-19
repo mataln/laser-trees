@@ -25,8 +25,8 @@ from simpleview_pytorch import SimpleView
 from torch.utils.data.dataset import Dataset
 
 
-def train(data_dir, model_dir, params):
-    wandb.login()
+def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_wandb=True):
+    #wandb.login()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -34,6 +34,7 @@ def train(data_dir, model_dir, params):
 
     trees_data = torch.load(dataset_name)
     val_data = torch.load(dataset_name)
+    
     print(trees_data.counts)
     print('Species: ', trees_data.species)
     print('Labels: ', trees_data.labels)
@@ -52,6 +53,8 @@ def train(data_dir, model_dir, params):
                              max_rotation = params["max_rotation"],
                              min_translation = params["min_translation"],
                              max_translation = params["max_translation"],
+                             min_scale = params["min_scale"],
+                             max_scale = params["max_scale"],
                              jitter_std = params["jitter_std"]
                              )
 
@@ -65,6 +68,8 @@ def train(data_dir, model_dir, params):
                              max_rotation = params["max_rotation"],
                              min_translation = params["min_translation"],
                              max_translation = params["max_translation"],
+                             min_scale = params["min_scale"],
+                             max_scale = params["max_scale"],
                              jitter_std = params["jitter_std"]
                              )
 
@@ -82,12 +87,15 @@ def train(data_dir, model_dir, params):
 
     experiment_name = wandb.util.generate_id()
 
-    run = wandb.init(
-        project='laser-trees',
-        group=experiment_name,
-        config=params,
-        tags=["new_sweep"])    
-
+    if init_wandb:
+        run = wandb.init(
+            project=wandb_project,
+            group=experiment_name,
+            config=params,
+            reinit=False
+            )
+    
+    wandb.config.update(params)
     config = wandb.config
     torch.manual_seed(config.random_seed)
     torch.cuda.manual_seed(config.random_seed)
@@ -118,12 +126,14 @@ def train(data_dir, model_dir, params):
 
     dataset_size = len(trees_data)
     indices = list(range(dataset_size))
-    split = int(np.floor(config.validation_split * dataset_size))
+    split2 = int(np.floor( (config.validation_split+config.test_split) * dataset_size ))
+    split1 = int(np.floor( config.test_split * dataset_size ))
 
-    if config.shuffle_dataset :
+    if config.shuffle_dataset:
         print("Shuffling dataset...")
         np.random.shuffle(indices)
-    train_indices, val_indices = indices[split:], indices[:split]
+                 
+    train_indices, val_indices, test_indices = indices[split2:], indices[split1:split2], indices[:split1]
 
     #Train sampler==========================================
     if config.train_sampler == "random": 
@@ -137,11 +147,13 @@ def train(data_dir, model_dir, params):
 
         sample_weights = torch.stack([label_weights[label] for label in trees_data.labels]) #Corresponding weight for each sample
         sample_weights[val_indices] = 0 #Never sample the validation dataset - set weights to zero
+        sample_weights[test_indices] = 0 #Same for test dataset
 
         train_sampler = WeightedRandomSampler(sample_weights, len(sample_weights))
     #=======================================================    
 
     val_sampler = SubsetRandomSampler(val_indices)
+    test_sampler = SubsetRandomSampler(test_indices)
 
     train_loader = torch.utils.data.DataLoader(trees_data, batch_size=config.batch_size, 
                                                sampler=train_sampler)
@@ -149,6 +161,10 @@ def train(data_dir, model_dir, params):
     val_data.set_params(transforms=['none']) #Turn off transforms for the validation dataset - DON'T GIVE IT AN EMPTY LIST
     validation_loader = torch.utils.data.DataLoader(val_data, batch_size=config.batch_size,
                                                     sampler=val_sampler)
+    
+    test_loader = torch.utils.data.DataLoader(val_data, batch_size=config.batch_size,
+                                              sampler=test_sampler)
+                                                
 
     assert set(config.species) == set(trees_data.species)
 
@@ -189,6 +205,9 @@ def train(data_dir, model_dir, params):
     best_acc = 0
     best_min_acc = 0
     
+    best_test_acc = 0
+    best_min_test_acc = 0
+    
     for epoch in range(config.epochs):  # loop over the dataset multiple times
 
         #Training loop============================================
@@ -223,9 +242,13 @@ def train(data_dir, model_dir, params):
 
         num_val_correct = 0
         num_val_samples = 0
+        
+        num_test_correct = 0
+        num_test_samples = 0
 
         running_train_loss = 0
         running_val_loss = 0
+        running_test_loss = 0
 
         model.eval()  
         with torch.no_grad():
@@ -247,8 +270,12 @@ def train(data_dir, model_dir, params):
             train_acc = float(num_train_correct)/float(num_train_samples)
             train_loss = running_train_loss/len(validation_loader)
 
+            
+            
+            
+            
 
-            #Test set eval===============
+            #Val set eval===============
             all_labels = torch.tensor([]).to(device)
             all_predictions = torch.tensor([]).to(device)
 
@@ -273,7 +300,7 @@ def train(data_dir, model_dir, params):
             val_acc = float(num_val_correct)/float(num_val_samples)
             val_loss = running_val_loss/len(validation_loader)
 
-            print(f'OVERALL: Got {num_val_correct} / {num_val_samples} with accuracy {val_acc*100:.2f}')
+            print(f'OVERALL (Val): Got {num_val_correct} / {num_val_samples} with accuracy {val_acc*100:.2f}')
 
             cm = confusion_matrix(all_labels.cpu(), all_predictions.cpu())
             totals = cm.sum(axis=1)
@@ -296,12 +323,77 @@ def train(data_dir, model_dir, params):
                 best_min_acc = min(accs)
                 
             wandb.log({"Best_min_acc":best_min_acc}, commit = False)
+            #==================================
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            #test set eval===============
+            all_labels = torch.tensor([]).to(device)
+            all_predictions = torch.tensor([]).to(device)
+
+            for data in test_loader:
+                depth_images = data['depth_images']
+                labels = data['labels']
+
+                depth_images = depth_images.to(device=device)
+                labels = labels.to(device=device)
+
+                scores = model(depth_images)
+                _, predictions = scores.max(1)
+
+                all_labels = torch.cat((all_labels, labels))
+                all_predictions = torch.cat((all_predictions, predictions))
+
+                num_test_correct += (predictions == labels).sum()
+                num_test_samples += predictions.size(0)
+
+                running_test_loss += loss_fn(scores, labels)
+
+            test_acc = float(num_test_correct)/float(num_test_samples)
+            test_loss = running_test_loss/len(test_loader)
+
+            print(f'OVERALL (test): Got {num_test_correct} / {num_test_samples} with accuracy {test_acc*100:.2f}')
+
+            cm = confusion_matrix(all_labels.cpu(), all_predictions.cpu())
+            totals = cm.sum(axis=1)
+            
+            accs = np.zeros(len(totals))
+            for i in range(len(totals)):
+                accs[i] = cm[i,i]/totals[i]
+                print(f"{trees_data.species[i]}: Got {cm[i,i]}/{totals[i]} with accuracy {(cm[i,i]/totals[i])*100:.2f}")
+                wandb.log({f"{trees_data.species[i]} Accuracy":(cm[i,i]/totals[i])}, commit = False)
+
+
+            if test_acc >= best_test_acc:
+                best_test_model_state = copy.deepcopy(model.state_dict())
+                best_test_acc = test_acc
+                
+            wandb.log({"Best_test_acc":best_test_acc}, commit = False)
+                
+            if min(accs) >= best_min_test_acc:
+                best_min_test_model_state = copy.deepcopy(model.state_dict())
+                best_min_test_acc = min(accs)
+                
+            wandb.log({"Best_min_test_acc":best_min_test_acc}, commit = False)
+            #==================================
+            
+            
+            
+            
                 
             wandb.log({
                 "Train Loss":train_loss,
                 "Validation Loss":val_loss,
+                "Test Loss":test_loss,
                 "Train Accuracy":train_acc,
                 "Validation Accuracy":val_acc,
+                "Test Accuracy":test_acc,
                 "Learning Rate":optimizer.param_groups[0]['lr'],
                 "Epoch":epoch
                 })
@@ -316,7 +408,7 @@ def train(data_dir, model_dir, params):
     torch.save(best_model_state,
                '{model_dir}/{fname}'.format(
                    model_dir=model_dir,
-                   fname=experiment_name+'_best')
+                   fname=wandb.run.name+'_best')
               )
     print('Saved!')
     
@@ -326,7 +418,7 @@ def train(data_dir, model_dir, params):
     torch.save(converged_model_state,
                '{model_dir}/{fname}'.format(
                    model_dir=model_dir,
-                   fname=experiment_name+'_converged')
+                   fname=wandb.run.name+'_converged')
               )
     print('Saved!')
     
@@ -335,8 +427,25 @@ def train(data_dir, model_dir, params):
     torch.save(best_min_model_state,
                '{model_dir}/{fname}'.format(
                    model_dir=model_dir,
-                   fname=experiment_name+'_best_prod')
+                   fname=wandb.run.name+'_best_prod')
               )
     print('Saved!')
+    
+    print('Saving best (test) model...')
+    print('Best overall accuracy: {}'.format(best_test_acc))
+    torch.save(best_test_model_state,
+               '{model_dir}/{fname}'.format(
+                   model_dir=model_dir,
+                   fname=wandb.run.name+'_best_test'))
+               
+    print('Saving best (test) producer accuracy model...')
+    print('Best (test) min producer accuracy: {}'.format(best_min_test_acc))
+    torch.save(best_min_test_model_state,
+               '{model_dir}/{fname}'.format(
+                   model_dir=model_dir,
+                   fname=wandb.run.name+'_best_test_prod'))
+               
 
-    run.finish()
+
+    if "run" in locals():
+        run.finish()

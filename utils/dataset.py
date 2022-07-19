@@ -161,6 +161,9 @@ class TreeSpeciesPointDataset(Dataset):
         self.min_translation = None
         self.max_translation = None
         
+        self.min_scale = None
+        self.max_scale = None
+        
         self.jitter_std = None
         
         filenames = list(filter(lambda t:t.endswith('.txt'), os.listdir(self.data_dir)))
@@ -201,6 +204,11 @@ class TreeSpeciesPointDataset(Dataset):
         if 'jitter' in transforms:
             points = self.jitter(points,
                                  jitter_std = self.jitter_std)
+            
+        if 'scaling' in transforms:
+            points = self.random_scaling(points,
+                                         min_scale=self.min_scale,
+                                         max_scale=self.max_scale)
             
         
         return torch.unsqueeze(
@@ -248,6 +256,8 @@ class TreeSpeciesPointDataset(Dataset):
                    max_rotation = None,
                    min_translation = None,
                    max_translation = None,
+                   min_scale = None,
+                   max_scale = None,
                    jitter_std = None):
      
         if image_dim:    
@@ -273,6 +283,10 @@ class TreeSpeciesPointDataset(Dataset):
                 
             if 'jitter' in transforms:
                 self.jitter_std = jitter_std
+                
+            if 'scaling' in transforms:
+                self.min_scale = min_scale
+                self.max_scale = max_scale
             
         return
     
@@ -299,6 +313,15 @@ class TreeSpeciesPointDataset(Dataset):
         tran = torch.rand(3)*(max_translation - min_translation) + min_translation
         
         return point_cloud + tran
+    
+    def random_scaling(self,
+                       point_cloud,
+                       min_scale = 0.5,
+                       max_scale = 1.5):
+        
+        scale = torch.rand(1)*(max_scale - min_scale) + min_scale
+        
+        return scale * point_cloud
     
     def jitter(self,
                point_cloud,

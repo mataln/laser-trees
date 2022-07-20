@@ -13,7 +13,9 @@ import os
 
 class TreeSpeciesDataset(Dataset):
     """Dataset for tree species classification from
-    point cloud depth projection images"""
+    point cloud depth projection images
+    
+    DON'T use this, it's not relevant any more"""
 
     def __init__(self, data_dir, metadata_file):
         """
@@ -229,8 +231,9 @@ class TreeSpeciesPointDataset(Dataset):
             if not(self.species[int(self.labels[i])] == species):
                 idx.append(i)
                 
-        self.point_clouds = [self.point_clouds[i] for i in idx]
-        self.labels = self.labels[idx]
+        self.point_clouds = [self.point_clouds[i] for i in idx] #Crop point clouds
+        self.labels = self.labels[idx] #Crop labels
+        self.meta_frame = self.meta_frame.iloc[idx] #Crop dataframe
                 
         old_species = self.species.copy() 
         self.species.pop(self.species.index(species)) #Pop from species list

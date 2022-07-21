@@ -44,8 +44,7 @@ def predict(dataset, val_indices, model, params):
     #val_sampler = SubsetRandomSampler(val_indices)
     
     #validation_loader = torch.utils.data.DataLoader(dataset, batch_size=128,
-                                                    #sampler=val_sampler)
-    print("foo")    
+                                                    #sampler=val_sampler) 
     val_dataset = torch.utils.data.Subset(dataset, val_indices)
     validation_loader = torch.utils.data.DataLoader(val_dataset, batch_size=128)
     

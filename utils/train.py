@@ -63,7 +63,7 @@ def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_w
                              f = params["f"],
                              camera_dist = params["camera_dist"],
                              soft_min_k = params["soft_min_k"],
-                             transforms = params["transforms"],
+                             transforms = params["transforms"], #Note to self - this is changed to none further down. Not going insane.
                              min_rotation = params["min_rotation"],
                              max_rotation = params["max_rotation"],
                              min_translation = params["min_translation"],
@@ -138,7 +138,7 @@ def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_w
     #Train sampler==========================================
     if config.train_sampler == "random": 
         print("Using random/uniform sampling...")
-        train_sampler = SubsetRandomSampler(train_indices)
+        train_sampler = SubsetRandomSampler(train_indices) #Unifrom random sampling without replacement
     elif config.train_sampler == "balanced":
         print("Using balanced sampling...")
         labels = trees_data.labels[train_indices] #Counts over 
@@ -159,7 +159,7 @@ def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_w
                                                sampler=train_sampler)
 
     val_data.set_params(transforms=['none']) #Turn off transforms for the validation dataset - DON'T GIVE IT AN EMPTY LIST
-    validation_loader = torch.utils.data.DataLoader(val_data, batch_size=config.batch_size,
+    validation_loader = torch.utils.data.DataLoader(val_data, batch_size=config.batch_size, #Val_data has all the data in it - not just val and test. Make sure to use the right samplers
                                                     sampler=val_sampler)
     
     test_loader = torch.utils.data.DataLoader(val_data, batch_size=config.batch_size,

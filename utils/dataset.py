@@ -173,14 +173,14 @@ class TreeSpeciesPointDataset(Dataset):
         
         self.labels = torch.zeros(no_files)
         
-        for i, file in tqdm(enumerate(filenames), total=no_files):
-            cloud = utils.pc_from_txt(self.data_dir + file)
-            cloud = utils.center_and_scale(cloud)
+        for i, file in tqdm(enumerate(filenames), total=no_files): #For each file in the directory
+            cloud = utils.pc_from_txt(self.data_dir + file) #Load the point cloud
+            cloud = utils.center_and_scale(cloud) #Center and scale it
             
-            self.point_clouds.append(torch.from_numpy(cloud))
+            self.point_clouds.append(torch.from_numpy(cloud)) #Add the point cloud to the dataset 
             
-            meta_entry = self.meta_frame[self.meta_frame.id==file[:-4]]
-            self.labels[i] = self.species.index(meta_entry.sp.values[0])
+            meta_entry = self.meta_frame[self.meta_frame.id==file[:-4]] #Get the relevant entry from the dataframe for this filename
+            self.labels[i] = self.species.index(meta_entry.sp.values[0]) #Add the species label (int, index from self.species) to the list of labels
             
         self.labels = self.labels.long()
         
@@ -233,8 +233,7 @@ class TreeSpeciesPointDataset(Dataset):
                 
         self.point_clouds = [self.point_clouds[i] for i in idx] #Crop point clouds
         self.labels = self.labels[idx] #Crop labels
-        self.meta_frame = self.meta_frame.iloc[idx] #Crop dataframe
-                
+            
         old_species = self.species.copy() 
         self.species.pop(self.species.index(species)) #Pop from species list
             

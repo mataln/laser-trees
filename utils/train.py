@@ -149,7 +149,7 @@ def train(data_dir, model_dir, params, wandb_project="laser-trees-bayes", init_w
         sample_weights[val_indices] = 0 #Never sample the validation dataset - set weights to zero
         sample_weights[test_indices] = 0 #Same for test dataset
 
-        train_sampler = WeightedRandomSampler(sample_weights, len(sample_weights))
+        train_sampler = WeightedRandomSampler(sample_weights, len(sample_weights)) #Replacement is true by default for the weighted sampler
     #=======================================================    
 
     val_sampler = SubsetRandomSampler(val_indices)
